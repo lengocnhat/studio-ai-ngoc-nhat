@@ -1,0 +1,1441 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Studio AI Ngọc Nhất — Virtual Try-On</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Be+Vietnam+Pro:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #C9A84C;
+    --gold-light: #E8CC7A;
+    --dark: #0D0D0D;
+    --dark-2: #161616;
+    --dark-3: #1E1E1E;
+    --dark-4: #2A2A2A;
+    --white: #F5F0E8;
+    --gray: #888;
+    --success: #4CAF82;
+    --error: #E05252;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--dark);
+    color: var(--white);
+    font-family: 'Be Vietnam Pro', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Background texture */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: 
+      radial-gradient(ellipse at 20% 50%, rgba(201,168,76,0.06) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 20%, rgba(201,168,76,0.04) 0%, transparent 40%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 20px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* HEADER */
+  header {
+    text-align: center;
+    padding: 48px 20px 36px;
+    border-bottom: 1px solid rgba(201,168,76,0.15);
+    position: relative;
+  }
+
+  .logo-tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 4px;
+    color: var(--gold);
+    text-transform: uppercase;
+    border: 1px solid rgba(201,168,76,0.3);
+    padding: 4px 14px;
+    border-radius: 20px;
+    margin-bottom: 16px;
+  }
+
+  h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(28px, 6vw, 48px);
+    font-weight: 900;
+    line-height: 1.1;
+    background: linear-gradient(135deg, var(--gold-light) 0%, var(--gold) 50%, #8B6914 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 8px;
+  }
+
+  .subtitle {
+    font-size: 13px;
+    color: var(--gray);
+    letter-spacing: 1px;
+    font-weight: 300;
+  }
+
+  /* STEPS INDICATOR */
+  .steps {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    padding: 32px 20px 0;
+    margin-bottom: 36px;
+  }
+
+  .step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .step-num {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 1.5px solid var(--dark-4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--gray);
+    background: var(--dark-2);
+    transition: all 0.3s;
+  }
+
+  .step.active .step-num {
+    border-color: var(--gold);
+    color: var(--gold);
+    background: rgba(201,168,76,0.1);
+    box-shadow: 0 0 16px rgba(201,168,76,0.2);
+  }
+
+  .step.done .step-num {
+    background: var(--gold);
+    border-color: var(--gold);
+    color: var(--dark);
+  }
+
+  .step-label {
+    font-size: 10px;
+    color: var(--gray);
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+  }
+
+  .step.active .step-label { color: var(--gold); }
+
+  .step-line {
+    width: 48px;
+    height: 1px;
+    background: var(--dark-4);
+    margin: 0 4px;
+    margin-bottom: 22px;
+    flex-shrink: 0;
+  }
+
+  /* UPLOAD SECTION */
+  .upload-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  @media (max-width: 600px) {
+    .upload-grid { grid-template-columns: 1fr; }
+    .step-line { width: 24px; }
+  }
+
+  .upload-card {
+    background: var(--dark-2);
+    border: 1.5px dashed rgba(201,168,76,0.2);
+    border-radius: 16px;
+    padding: 24px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+    min-height: 220px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .upload-card:hover {
+    border-color: rgba(201,168,76,0.5);
+    background: rgba(201,168,76,0.04);
+    transform: translateY(-2px);
+  }
+
+  .upload-card.has-image {
+    border-style: solid;
+    border-color: rgba(201,168,76,0.4);
+    padding: 0;
+  }
+
+  .upload-card.has-image:hover { transform: none; }
+
+  .upload-card input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  .upload-icon {
+    font-size: 36px;
+    margin-bottom: 12px;
+    display: block;
+  }
+
+  .upload-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--white);
+    margin-bottom: 4px;
+  }
+
+  .upload-hint {
+    font-size: 11px;
+    color: var(--gray);
+    line-height: 1.5;
+  }
+
+  .upload-badge {
+    display: inline-block;
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--gold);
+    border: 1px solid rgba(201,168,76,0.3);
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-bottom: 12px;
+  }
+
+  .preview-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 14px;
+    display: block;
+  }
+
+  .remove-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.7);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: white;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    transition: all 0.2s;
+  }
+
+  .remove-btn:hover { background: var(--error); }
+
+  /* OPTIONS */
+  .options-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  @media (max-width: 500px) { .options-row { grid-template-columns: 1fr; } }
+
+  .option-group label {
+    display: block;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 8px;
+    font-weight: 600;
+  }
+
+  .option-group select,
+  .option-group input[type="text"],
+  .option-group input[type="password"] {
+    width: 100%;
+    background: var(--dark-3);
+    border: 1px solid var(--dark-4);
+    color: var(--white);
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-family: 'Be Vietnam Pro', sans-serif;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+    appearance: none;
+  }
+
+  .option-group select:focus,
+  .option-group input:focus {
+    border-color: rgba(201,168,76,0.4);
+  }
+
+  /* TAG PICKER SYSTEM */
+  .tag-section {
+    background: var(--dark-2);
+    border: 1px solid var(--dark-4);
+    border-radius: 16px;
+    padding: 18px;
+    margin-bottom: 14px;
+    transition: border-color 0.2s;
+  }
+
+  .tag-section:focus-within {
+    border-color: rgba(201,168,76,0.25);
+  }
+
+  .tag-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .tag-section-label {
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--gold);
+    font-weight: 600;
+  }
+
+  .tag-clear-btn {
+    font-size: 10px;
+    color: var(--gray);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: 'Be Vietnam Pro', sans-serif;
+    transition: color 0.2s;
+  }
+
+  .tag-clear-btn:hover { color: var(--error); }
+
+  /* Preset tags */
+  .preset-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    margin-bottom: 12px;
+  }
+
+  .preset-tag {
+    background: var(--dark-3);
+    border: 1px solid var(--dark-4);
+    color: rgba(245,240,232,0.65);
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.18s;
+    user-select: none;
+    white-space: nowrap;
+  }
+
+  .preset-tag:hover {
+    border-color: rgba(201,168,76,0.35);
+    color: var(--white);
+  }
+
+  .preset-tag.selected {
+    background: rgba(201,168,76,0.12);
+    border-color: var(--gold);
+    color: var(--gold-light);
+  }
+
+  /* Selected tags display */
+  .selected-tags-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+    min-height: 0;
+  }
+
+  .selected-tag {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(201,168,76,0.15);
+    border: 1px solid rgba(201,168,76,0.35);
+    color: var(--gold-light);
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .selected-tag-remove {
+    background: none;
+    border: none;
+    color: rgba(201,168,76,0.6);
+    cursor: pointer;
+    font-size: 11px;
+    padding: 0;
+    line-height: 1;
+    transition: color 0.15s;
+  }
+
+  .selected-tag-remove:hover { color: var(--error); }
+
+  /* Custom input row */
+  .custom-input-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .custom-input-row input {
+    flex: 1;
+    background: var(--dark-3);
+    border: 1px solid var(--dark-4);
+    color: var(--white);
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-family: 'Be Vietnam Pro', sans-serif;
+    font-size: 12px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .custom-input-row input::placeholder { color: rgba(136,136,136,0.6); }
+  .custom-input-row input:focus { border-color: rgba(201,168,76,0.4); }
+
+  .add-tag-btn {
+    background: rgba(201,168,76,0.1);
+    border: 1px solid rgba(201,168,76,0.25);
+    color: var(--gold);
+    padding: 8px 14px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+    font-family: 'Be Vietnam Pro', sans-serif;
+  }
+
+  .add-tag-btn:hover {
+    background: rgba(201,168,76,0.2);
+  }
+
+  /* Active summary */
+  .active-summary {
+    font-size: 11px;
+    color: rgba(245,240,232,0.4);
+    margin-top: 8px;
+    font-style: italic;
+    line-height: 1.4;
+    min-height: 16px;
+  }
+
+  .active-summary span { color: rgba(201,168,76,0.7); font-style: normal; }
+
+  /* API KEY SECTION */
+  .api-section {
+    background: var(--dark-2);
+    border: 1px solid rgba(201,168,76,0.15);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+
+  .api-section-title {
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--gold);
+    font-weight: 600;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .api-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .api-row input {
+    flex: 1;
+    background: var(--dark-3);
+    border: 1px solid var(--dark-4);
+    color: var(--white);
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-family: 'Be Vietnam Pro', sans-serif;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .api-row input:focus { border-color: rgba(201,168,76,0.4); }
+
+  .api-help {
+    font-size: 11px;
+    color: var(--gray);
+    margin-top: 8px;
+    line-height: 1.5;
+  }
+
+  .api-help a {
+    color: var(--gold);
+    text-decoration: none;
+  }
+
+  .api-help a:hover { text-decoration: underline; }
+
+  /* GENERATE BUTTON */
+  .generate-btn {
+    width: 100%;
+    padding: 16px;
+    background: linear-gradient(135deg, var(--gold) 0%, #8B6914 100%);
+    border: none;
+    border-radius: 14px;
+    color: var(--dark);
+    font-family: 'Playfair Display', serif;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 32px;
+  }
+
+  .generate-btn::before {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%;
+    width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+    transition: left 0.5s;
+  }
+
+  .generate-btn:hover::before { left: 100%; }
+  .generate-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(201,168,76,0.3); }
+  .generate-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  /* LOADING */
+  .loading-state {
+    display: none;
+    text-align: center;
+    padding: 48px 20px;
+  }
+
+  .loading-state.show { display: block; }
+
+  .spinner {
+    width: 48px;
+    height: 48px;
+    border: 2px solid rgba(201,168,76,0.2);
+    border-top-color: var(--gold);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 20px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading-text {
+    font-family: 'Playfair Display', serif;
+    font-size: 18px;
+    color: var(--gold);
+    margin-bottom: 8px;
+  }
+
+  .loading-sub { font-size: 12px; color: var(--gray); }
+
+  /* RESULT SECTION */
+  .result-section {
+    display: none;
+    animation: fadeUp 0.6s ease;
+  }
+
+  .result-section.show { display: block; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .result-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+
+  .result-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px;
+    color: var(--gold);
+  }
+
+  .result-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  @media (max-width: 600px) { .result-grid { grid-template-columns: 1fr; } }
+
+  .result-img-wrap {
+    background: var(--dark-2);
+    border-radius: 16px;
+    overflow: hidden;
+    aspect-ratio: 3/4;
+    position: relative;
+  }
+
+  .result-img-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .result-img-label {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: white;
+    background: rgba(0,0,0,0.6);
+    padding: 4px 10px;
+    border-radius: 10px;
+    backdrop-filter: blur(4px);
+  }
+
+  /* CONTENT CARDS */
+  .content-card {
+    background: var(--dark-2);
+    border: 1px solid var(--dark-4);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 14px;
+    transition: border-color 0.2s;
+  }
+
+  .content-card:hover { border-color: rgba(201,168,76,0.2); }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .card-tag {
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--gold);
+    font-weight: 600;
+  }
+
+  .copy-btn {
+    background: transparent;
+    border: 1px solid var(--dark-4);
+    color: var(--gray);
+    padding: 4px 12px;
+    border-radius: 8px;
+    font-size: 11px;
+    cursor: pointer;
+    font-family: 'Be Vietnam Pro', sans-serif;
+    transition: all 0.2s;
+  }
+
+  .copy-btn:hover {
+    border-color: var(--gold);
+    color: var(--gold);
+  }
+
+  .copy-btn.copied {
+    border-color: var(--success);
+    color: var(--success);
+  }
+
+  .card-content {
+    font-size: 14px;
+    line-height: 1.7;
+    color: rgba(245,240,232,0.85);
+  }
+
+  .hashtag-wrap { display: flex; flex-wrap: wrap; gap: 8px; }
+
+  .hashtag {
+    background: rgba(201,168,76,0.08);
+    border: 1px solid rgba(201,168,76,0.15);
+    color: var(--gold-light);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  /* PROMPT SECTION */
+  .prompt-card {
+    background: var(--dark-3);
+    border: 1px solid var(--dark-4);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 14px;
+    font-family: monospace;
+    font-size: 12px;
+    color: rgba(245,240,232,0.6);
+    line-height: 1.6;
+    word-break: break-word;
+  }
+
+  /* DOWNLOAD BTN */
+  .download-btn {
+    width: 100%;
+    padding: 14px;
+    background: transparent;
+    border: 1.5px solid var(--gold);
+    color: var(--gold);
+    border-radius: 12px;
+    font-family: 'Be Vietnam Pro', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    margin-bottom: 12px;
+  }
+
+  .download-btn:hover {
+    background: rgba(201,168,76,0.1);
+  }
+
+  .reset-btn {
+    width: 100%;
+    padding: 12px;
+    background: transparent;
+    border: 1px solid var(--dark-4);
+    color: var(--gray);
+    border-radius: 12px;
+    font-family: 'Be Vietnam Pro', sans-serif;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 48px;
+  }
+
+  .reset-btn:hover { border-color: var(--gray); color: var(--white); }
+
+  /* ERROR */
+  .error-box {
+    display: none;
+    background: rgba(224,82,82,0.1);
+    border: 1px solid rgba(224,82,82,0.3);
+    border-radius: 12px;
+    padding: 16px;
+    color: #E05252;
+    font-size: 13px;
+    line-height: 1.6;
+    margin-bottom: 20px;
+  }
+
+  .error-box.show { display: block; }
+
+  /* DIVIDER */
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 28px 0;
+  }
+
+  .divider-line { flex: 1; height: 1px; background: var(--dark-4); }
+  .divider-text { font-size: 10px; letter-spacing: 2px; color: var(--gray); text-transform: uppercase; }
+
+  /* DEMO MODE NOTICE */
+  .demo-notice {
+    background: rgba(201,168,76,0.06);
+    border: 1px solid rgba(201,168,76,0.15);
+    border-radius: 12px;
+    padding: 14px 16px;
+    font-size: 12px;
+    color: rgba(201,168,76,0.8);
+    line-height: 1.6;
+    margin-bottom: 20px;
+  }
+
+  /* GUIDE LINK */
+  .guide-box {
+    background: var(--dark-2);
+    border: 1px solid var(--dark-4);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 32px;
+  }
+
+  .guide-title {
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--gold);
+    font-weight: 600;
+    margin-bottom: 14px;
+  }
+
+  .guide-step {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 10px;
+    font-size: 12px;
+    color: rgba(245,240,232,0.7);
+    line-height: 1.5;
+  }
+
+  .guide-num {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: rgba(201,168,76,0.15);
+    color: var(--gold);
+    font-size: 10px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .kolors-link {
+    display: block;
+    background: rgba(201,168,76,0.08);
+    border: 1px solid rgba(201,168,76,0.2);
+    border-radius: 10px;
+    padding: 12px 16px;
+    color: var(--gold);
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    text-align: center;
+    margin-top: 14px;
+    transition: all 0.2s;
+  }
+
+  .kolors-link:hover {
+    background: rgba(201,168,76,0.15);
+  }
+
+  footer {
+    text-align: center;
+    padding: 24px;
+    font-size: 11px;
+    color: var(--dark-4);
+    letter-spacing: 1px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-tag">✦ AI Fashion Studio ✦</div>
+  <h1>STUDIO AI NGỌC NHẤT</h1>
+  <p class="subtitle">Virtual Try-On • Thay Trang Phục Bằng AI</p>
+</header>
+
+<div class="container">
+
+  <!-- STEPS -->
+  <div class="steps">
+    <div class="step active" id="step1">
+      <div class="step-num">1</div>
+      <div class="step-label">Tải ảnh</div>
+    </div>
+    <div class="step-line"></div>
+    <div class="step" id="step2">
+      <div class="step-num">2</div>
+      <div class="step-label">Cài đặt</div>
+    </div>
+    <div class="step-line"></div>
+    <div class="step" id="step3">
+      <div class="step-num">3</div>
+      <div class="step-label">Tạo ảnh</div>
+    </div>
+    <div class="step-line"></div>
+    <div class="step" id="step4">
+      <div class="step-num">4</div>
+      <div class="step-label">Kết quả</div>
+    </div>
+  </div>
+
+  <!-- MAIN FORM -->
+  <div id="mainForm">
+
+    <!-- UPLOAD AREA -->
+    <div class="upload-grid">
+      <div class="upload-card" id="modelCard">
+        <input type="file" id="modelInput" accept="image/*" onchange="handleUpload('model', this)">
+        <span class="upload-badge">👤 Người mẫu</span>
+        <span class="upload-icon">＋</span>
+        <div class="upload-title">Ảnh Người Mẫu</div>
+        <div class="upload-hint">Chụp thẳng, rõ mặt<br>Nền đơn giản tốt hơn</div>
+      </div>
+
+      <div class="upload-card" id="garmentCard">
+        <input type="file" id="garmentInput" accept="image/*" onchange="handleUpload('garment', this)">
+        <span class="upload-badge">👗 Trang phục</span>
+        <span class="upload-icon">＋</span>
+        <div class="upload-title">Ảnh Trang Phục</div>
+        <div class="upload-hint">Nền trắng càng tốt<br>Rõ chi tiết, không nhàu</div>
+      </div>
+    </div>
+
+    <!-- OPTIONS: PHONG CÁCH -->
+    <div class="tag-section">
+      <div class="tag-section-header">
+        <div class="tag-section-label">🎨 Phong Cách</div>
+        <button class="tag-clear-btn" onclick="clearTags('style')">Xóa hết</button>
+      </div>
+      <div class="preset-tags" id="stylePresets">
+        <span class="preset-tag" onclick="toggleTag('style','Street Style')">Street Style</span>
+        <span class="preset-tag" onclick="toggleTag('style','Lookbook Editorial')">Lookbook</span>
+        <span class="preset-tag" onclick="toggleTag('style','Studio chuyên nghiệp')">Studio</span>
+        <span class="preset-tag" onclick="toggleTag('style','Phong cách Hàn Quốc')">Hàn Quốc</span>
+        <span class="preset-tag" onclick="toggleTag('style','Luxury cao cấp')">Luxury</span>
+        <span class="preset-tag" onclick="toggleTag('style','Y2K retro')">Y2K</span>
+        <span class="preset-tag" onclick="toggleTag('style','Minimalist tối giản')">Minimalist</span>
+        <span class="preset-tag" onclick="toggleTag('style','Vintage cổ điển')">Vintage</span>
+        <span class="preset-tag" onclick="toggleTag('style','Bohemian boho')">Boho</span>
+        <span class="preset-tag" onclick="toggleTag('style','Sporty năng động')">Sporty</span>
+        <span class="preset-tag" onclick="toggleTag('style','Preppy học đường')">Preppy</span>
+        <span class="preset-tag" onclick="toggleTag('style','Cottagecore đồng quê')">Cottagecore</span>
+        <span class="preset-tag" onclick="toggleTag('style','Dark moody')">Dark Moody</span>
+        <span class="preset-tag" onclick="toggleTag('style','Pastel soft girl')">Soft Girl</span>
+        <span class="preset-tag" onclick="toggleTag('style','Business casual')">Business</span>
+        <span class="preset-tag" onclick="toggleTag('style','Athleisure')">Athleisure</span>
+        <span class="preset-tag" onclick="toggleTag('style','Dopamine dressing màu sắc')">Dopamine</span>
+        <span class="preset-tag" onclick="toggleTag('style','Capsule wardrobe cơ bản')">Capsule</span>
+      </div>
+      <div class="selected-tags-wrap" id="styleSelected"></div>
+      <div class="custom-input-row">
+        <input type="text" id="styleCustom" placeholder="Nhập phong cách khác... (VD: Cyberpunk, Cottagecore Nhật Bản...)" onkeydown="if(event.key==='Enter')addCustomTag('style')">
+        <button class="add-tag-btn" onclick="addCustomTag('style')">+ Thêm</button>
+      </div>
+      <div class="active-summary" id="styleSummary">Chưa chọn phong cách nào</div>
+    </div>
+
+    <!-- OPTIONS: BỐI CẢNH -->
+    <div class="tag-section">
+      <div class="tag-section-header">
+        <div class="tag-section-label">🏙️ Bối Cảnh</div>
+        <button class="tag-clear-btn" onclick="clearTags('bg')">Xóa hết</button>
+      </div>
+      <div class="preset-tags" id="bgPresets">
+        <span class="preset-tag" onclick="toggleTag('bg','Phố đô thị Việt Nam')">Phố Việt Nam</span>
+        <span class="preset-tag" onclick="toggleTag('bg','Studio nền trắng')">Studio trắng</span>
+        <span class="preset-tag" onclick="toggleTag('bg','Quán cafe aesthetic')">Cafe</span>
+        <span class="preset-tag" onclick="toggleTag('bg','Showroom thời trang')">Showroom</span>
+        <span class="preset-tag" onclick="toggleTag('bg','Thiên nhiên cây xanh')">Thiên nhiên</span>
+        <span class="preset-tag" onclick="toggleTag('bg','Bãi biển nắng vàng')">Bãi biển</span>
+        <span class="preset-tag" onclick="toggleTag('bg','Phố cổ Hà Nội')">Phố cổ HN</span>
+        <span class="preset-tag" onclick="toggleTag('bg','Đường phố Sài Gòn')">Sài Gòn</span>
+        <span class="preset-tag" onclick="toggleTag('bg','Ruộng bậc thang Sapa')">Sapa</span>
+        <span class="preset-tag" onclick="toggleTag('bg','Hội An đèn lồng')">Hội An</span>
+        <span class="preset-tag" onclick="toggleTag('bg','Khách sạn sang trọng')">Hotel luxury</span>
+        <span class="preset-tag" onclick="toggleTag('bg','Sân thượng rooftop thành phố')">Rooftop</span>
+        <span class="preset-tag" onclick="toggleTag('bg','Cầu thang nghệ thuật')">Cầu thang</span>
+        <span class="preset-tag" onclick="toggleTag('bg','Rừng tre xanh')">Rừng tre</span>
+        <span class="preset-tag" onclick="toggleTag('bg','Phố Seoul Hàn Quốc')">Seoul</span>
+        <span class="preset-tag" onclick="toggleTag('bg','Tokyo Nhật Bản')">Tokyo</span>
+        <span class="preset-tag" onclick="toggleTag('bg','Paris châu Âu')">Paris</span>
+        <span class="preset-tag" onclick="toggleTag('bg','Nền gradient màu sắc')">Gradient</span>
+        <span class="preset-tag" onclick="toggleTag('bg','Studio nền đen')">Studio đen</span>
+        <span class="preset-tag" onclick="toggleTag('bg','Vườn hoa')">Vườn hoa</span>
+      </div>
+      <div class="selected-tags-wrap" id="bgSelected"></div>
+      <div class="custom-input-row">
+        <input type="text" id="bgCustom" placeholder="Nhập bối cảnh khác... (VD: Đồng cỏ Đà Lạt, Phòng ngủ aesthetic...)" onkeydown="if(event.key==='Enter')addCustomTag('bg')">
+        <button class="add-tag-btn" onclick="addCustomTag('bg')">+ Thêm</button>
+      </div>
+      <div class="active-summary" id="bgSummary">Chưa chọn bối cảnh nào</div>
+    </div>
+
+    <!-- OPTIONS: TONE + TỈ LỆ -->
+    <div class="options-row">
+      <div class="option-group">
+        <label>🌈 Tone màu</label>
+        <select id="toneSelect">
+          <option value="warm">🌅 Warm — Vàng ấm áp</option>
+          <option value="cool">🩵 Cool — Mát trong trẻo</option>
+          <option value="neutral">⚪ Neutral — Tự nhiên</option>
+          <option value="dark">🖤 Dark — Tối huyền bí</option>
+          <option value="pastel">🌸 Pastel — Nhẹ nhàng</option>
+          <option value="vivid">🎨 Vivid — Rực rỡ bão hòa</option>
+          <option value="film">🎞️ Film — Tone phim cũ</option>
+          <option value="bw">⬛ B&W — Đen trắng</option>
+        </select>
+      </div>
+      <div class="option-group">
+        <label>📐 Tỉ lệ ảnh</label>
+        <select id="ratioSelect">
+          <option value="9:16">9:16 — TikTok / Story dọc</option>
+          <option value="4:5">4:5 — Instagram Feed</option>
+          <option value="1:1">1:1 — Vuông Facebook</option>
+          <option value="3:4">3:4 — Portrait chuẩn</option>
+          <option value="16:9">16:9 — Ngang YouTube</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- OPTIONS: CHI TIẾT THÊM -->
+    <div class="tag-section">
+      <div class="tag-section-header">
+        <div class="tag-section-label">✨ Yêu Cầu Đặc Biệt (Tùy chọn)</div>
+        <button class="tag-clear-btn" onclick="clearTags('extra')">Xóa hết</button>
+      </div>
+      <div class="preset-tags" id="extraPresets">
+        <span class="preset-tag" onclick="toggleTag('extra','ánh sáng vàng giờ vàng golden hour')">Golden Hour</span>
+        <span class="preset-tag" onclick="toggleTag('extra','bokeh nền mờ ảo')">Bokeh mạnh</span>
+        <span class="preset-tag" onclick="toggleTag('extra','ánh sáng tự nhiên cửa sổ')">Sáng cửa sổ</span>
+        <span class="preset-tag" onclick="toggleTag('extra','tư thế đi bộ tự nhiên')">Đang đi bộ</span>
+        <span class="preset-tag" onclick="toggleTag('extra','tư thế ngồi thanh lịch')">Tư thế ngồi</span>
+        <span class="preset-tag" onclick="toggleTag('extra','nhìn thẳng vào ống kính')">Nhìn thẳng</span>
+        <span class="preset-tag" onclick="toggleTag('extra','nhìn xa không nhìn camera')">Nhìn xa</span>
+        <span class="preset-tag" onclick="toggleTag('extra','ảnh full body toàn thân')">Full body</span>
+        <span class="preset-tag" onclick="toggleTag('extra','ảnh nửa người half body')">Half body</span>
+        <span class="preset-tag" onclick="toggleTag('extra','ảnh cận mặt close-up')">Cận mặt</span>
+        <span class="preset-tag" onclick="toggleTag('extra','gió thổi tóc bay')">Tóc bay</span>
+        <span class="preset-tag" onclick="toggleTag('extra','cầm túi xách thời trang')">Cầm túi</span>
+        <span class="preset-tag" onclick="toggleTag('extra','đeo kính mắt thời trang')">Đeo kính</span>
+        <span class="preset-tag" onclick="toggleTag('extra','chụp từ góc thấp worm eye view')">Góc thấp</span>
+        <span class="preset-tag" onclick="toggleTag('extra','chụp từ góc cao bird eye view')">Góc cao</span>
+      </div>
+      <div class="selected-tags-wrap" id="extraSelected"></div>
+      <div class="custom-input-row">
+        <input type="text" id="extraCustom" placeholder="Yêu cầu riêng... (VD: có ô dù, ngồi bậc thang, tay cầm ly cà phê...)" onkeydown="if(event.key==='Enter')addCustomTag('extra')">
+        <button class="add-tag-btn" onclick="addCustomTag('extra')">+ Thêm</button>
+      </div>
+      <div class="active-summary" id="extraSummary">Không có yêu cầu đặc biệt</div>
+    </div>
+
+    <!-- API KEY -->
+    <div class="api-section">
+      <div class="api-section-title">🔑 Gemini API Key</div>
+      <div class="api-row">
+        <input type="password" id="apiKeyInput" placeholder="Dán API Key của bạn vào đây...">
+      </div>
+      <div class="api-help">
+        Chưa có API Key? → Vào 
+        <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a>
+        → Nhấn <strong>"Create API key"</strong> → Copy → Dán vào ô trên.<br>
+        <strong>Miễn phí hoàn toàn.</strong> Key chỉ lưu trong trình duyệt của bạn, không gửi đi đâu khác.
+      </div>
+    </div>
+
+    <!-- ERROR BOX -->
+    <div class="error-box" id="errorBox"></div>
+
+    <!-- GENERATE BUTTON -->
+    <button class="generate-btn" id="generateBtn" onclick="generate()">
+      ✨ TẠO NỘI DUNG NGAY
+    </button>
+
+    <!-- GUIDE TO KOLORS -->
+    <div class="guide-box">
+      <div class="guide-title">🖼️ Bước tạo ảnh thật — Dùng Kolors (Miễn phí)</div>
+      <div class="guide-step"><div class="guide-num">1</div><div>Nhấn nút bên dưới để mở Kolors Virtual Try-On</div></div>
+      <div class="guide-step"><div class="guide-num">2</div><div>Upload ảnh người mẫu vào ô bên trái</div></div>
+      <div class="guide-step"><div class="guide-num">3</div><div>Upload ảnh trang phục vào ô bên phải</div></div>
+      <div class="guide-step"><div class="guide-num">4</div><div>Nhấn <strong>Run</strong> → chờ 30 giây → tải ảnh về</div></div>
+      <div class="guide-step"><div class="guide-num">5</div><div>Quay lại đây để lấy caption + hashtag đã tạo sẵn 🎉</div></div>
+      <a class="kolors-link" href="https://huggingface.co/spaces/Kwai-Kolors/Kolors-Virtual-Try-On" target="_blank">
+        👗 Mở Kolors Virtual Try-On →
+      </a>
+    </div>
+
+  </div>
+
+  <!-- LOADING -->
+  <div class="loading-state" id="loadingState">
+    <div class="spinner"></div>
+    <div class="loading-text">Đang phân tích & tạo nội dung...</div>
+    <div class="loading-sub">Gemini đang đọc ảnh và viết caption cho bạn</div>
+  </div>
+
+  <!-- RESULT -->
+  <div class="result-section" id="resultSection">
+
+    <div class="result-header">
+      <div class="result-title">✨ Kết Quả</div>
+    </div>
+
+    <!-- IMAGE PREVIEW -->
+    <div class="result-grid" id="resultImgGrid">
+      <div class="result-img-wrap" id="modelPreviewWrap">
+        <img id="modelPreviewResult" src="" alt="Người mẫu">
+        <div class="result-img-label">Người mẫu</div>
+      </div>
+      <div class="result-img-wrap" id="garmentPreviewWrap">
+        <img id="garmentPreviewResult" src="" alt="Trang phục">
+        <div class="result-img-label">Trang phục</div>
+      </div>
+    </div>
+
+    <div class="demo-notice">
+      💡 <strong>Bước tiếp theo:</strong> Upload 2 ảnh trên vào Kolors (link bên dưới) để tạo ảnh thật. 
+      Trong lúc đó, caption & hashtag bên dưới đã sẵn sàng để bạn đăng bài!
+    </div>
+
+    <a class="kolors-link" href="https://huggingface.co/spaces/Kwai-Kolors/Kolors-Virtual-Try-On" target="_blank" style="margin-bottom: 24px; display: block;">
+      👗 Mở Kolors để tạo ảnh mặc thử →
+    </a>
+
+    <!-- PROMPT SECTION -->
+    <div class="divider">
+      <div class="divider-line"></div>
+      <div class="divider-text">Prompt đã tạo</div>
+      <div class="divider-line"></div>
+    </div>
+
+    <div class="content-card">
+      <div class="card-header">
+        <div class="card-tag">📋 Prompt cho Kolors / Ideogram</div>
+        <button class="copy-btn" onclick="copyText('promptContent', this)">Copy</button>
+      </div>
+      <div class="prompt-card" id="promptContent"></div>
+    </div>
+
+    <!-- CAPTIONS -->
+    <div class="divider">
+      <div class="divider-line"></div>
+      <div class="divider-text">Caption & Hashtag</div>
+      <div class="divider-line"></div>
+    </div>
+
+    <div class="content-card">
+      <div class="card-header">
+        <div class="card-tag">✍️ Caption 1 — Cảm xúc / Lifestyle</div>
+        <button class="copy-btn" onclick="copyText('caption1', this)">Copy</button>
+      </div>
+      <div class="card-content" id="caption1"></div>
+    </div>
+
+    <div class="content-card">
+      <div class="card-header">
+        <div class="card-tag">✍️ Caption 2 — Mô tả sản phẩm</div>
+        <button class="copy-btn" onclick="copyText('caption2', this)">Copy</button>
+      </div>
+      <div class="card-content" id="caption2"></div>
+    </div>
+
+    <div class="content-card">
+      <div class="card-header">
+        <div class="card-tag">✍️ Caption 3 — Kêu gọi hành động</div>
+        <button class="copy-btn" onclick="copyText('caption3', this)">Copy</button>
+      </div>
+      <div class="card-content" id="caption3"></div>
+    </div>
+
+    <div class="content-card">
+      <div class="card-header">
+        <div class="card-tag">#️⃣ Hashtag (15 cái)</div>
+        <button class="copy-btn" onclick="copyText('hashtagContent', this)">Copy</button>
+      </div>
+      <div class="hashtag-wrap" id="hashtagContent"></div>
+    </div>
+
+    <button class="download-btn" onclick="downloadAll()">
+      💾 Tải toàn bộ Caption & Hashtag (.txt)
+    </button>
+
+    <button class="reset-btn" onclick="resetApp()">
+      ↩ Tạo bộ ảnh mới
+    </button>
+
+  </div>
+
+</div>
+
+<footer>STUDIO AI NGỌC NHẤT • Powered by Gemini AI</footer>
+
+<script>
+  let modelFile = null, garmentFile = null;
+  let modelDataUrl = '', garmentDataUrl = '';
+  let resultData = {};
+
+  // ── TAG PICKER STATE ──
+  const tagState = { style: [], bg: [], extra: [] };
+
+  function toggleTag(type, value) {
+    const arr = tagState[type];
+    const idx = arr.indexOf(value);
+    idx > -1 ? arr.splice(idx, 1) : arr.push(value);
+    renderTags(type);
+    syncHighlight(type);
+  }
+
+  function addCustomTag(type) {
+    const input = document.getElementById(type + 'Custom');
+    const val = input.value.trim();
+    if (!val || tagState[type].includes(val)) { input.value=''; return; }
+    tagState[type].push(val);
+    renderTags(type);
+    input.value = '';
+  }
+
+  function removeTag(type, idx) {
+    tagState[type].splice(idx, 1);
+    renderTags(type);
+    syncHighlight(type);
+  }
+
+  function clearTags(type) {
+    tagState[type] = [];
+    renderTags(type);
+    syncHighlight(type);
+  }
+
+  function syncHighlight(type) {
+    document.querySelectorAll('#' + type + 'Presets .preset-tag').forEach(el => {
+      el.classList.toggle('selected', tagState[type].includes(el.dataset.val));
+    });
+  }
+
+  function renderTags(type) {
+    const wrap = document.getElementById(type + 'Selected');
+    const summary = document.getElementById(type + 'Summary');
+    wrap.innerHTML = tagState[type].map((v,i) =>
+      `<span class="selected-tag">${v}<button class="selected-tag-remove" onclick="removeTag('${type}',${i})">✕</button></span>`
+    ).join('');
+    const defaults = { style:'Chưa chọn phong cách nào', bg:'Chưa chọn bối cảnh nào', extra:'Không có yêu cầu đặc biệt' };
+    const labels = { style:'phong cách', bg:'bối cảnh', extra:'yêu cầu' };
+    summary.innerHTML = tagState[type].length === 0
+      ? defaults[type]
+      : `Đã chọn <span>${tagState[type].length} ${labels[type]}</span>: ${tagState[type].join(' • ')}`;
+  }
+
+  // Store data-val on preset tags for highlight sync
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.preset-tag').forEach(el => {
+      const m = el.getAttribute('onclick').match(/'([^']+)'\s*\)/);
+      if (m) el.dataset.val = m[1];
+    });
+  });
+
+  // ── UPLOAD ──
+  function handleUpload(type, input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      const url = e.target.result;
+      if (type === 'model') { modelFile=file; modelDataUrl=url; showPreview('modelCard','modelInput',url); }
+      else { garmentFile=file; garmentDataUrl=url; showPreview('garmentCard','garmentInput',url); }
+      updateSteps();
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function showPreview(cardId, inputId, url) {
+    const card = document.getElementById(cardId);
+    card.classList.add('has-image');
+    card.innerHTML = `<img class="preview-img" src="${url}"><button class="remove-btn" onclick="removeImage('${cardId}','${inputId}',event)">✕</button>`;
+  }
+
+  function removeImage(cardId, inputId, e) {
+    e.stopPropagation();
+    const card = document.getElementById(cardId);
+    card.classList.remove('has-image');
+    const isModel = cardId === 'modelCard';
+    if (isModel) { modelFile=null; modelDataUrl=''; }
+    else { garmentFile=null; garmentDataUrl=''; }
+    card.innerHTML = isModel
+      ? `<input type="file" id="modelInput" accept="image/*" onchange="handleUpload('model',this)"><span class="upload-badge">👤 Người mẫu</span><span class="upload-icon">＋</span><div class="upload-title">Ảnh Người Mẫu</div><div class="upload-hint">Chụp thẳng, rõ mặt<br>Nền đơn giản tốt hơn</div>`
+      : `<input type="file" id="garmentInput" accept="image/*" onchange="handleUpload('garment',this)"><span class="upload-badge">👗 Trang phục</span><span class="upload-icon">＋</span><div class="upload-title">Ảnh Trang Phục</div><div class="upload-hint">Nền trắng càng tốt<br>Rõ chi tiết, không nhàu</div>`;
+    updateSteps();
+  }
+
+  function updateSteps() {
+    const s1 = document.getElementById('step1'), s2 = document.getElementById('step2');
+    if (modelDataUrl && garmentDataUrl) { s1.classList.replace('active','done') || (s1.classList.remove('active'),s1.classList.add('done')); s2.classList.add('active'); }
+    else { s1.classList.add('active'); s1.classList.remove('done'); s2.classList.remove('active'); }
+  }
+
+  function showError(msg) {
+    const box = document.getElementById('errorBox');
+    box.textContent = msg; box.classList.add('show');
+    setTimeout(() => box.classList.remove('show'), 7000);
+  }
+
+  function fileToBase64(d) { return d.split(',')[1]; }
+  function getMime(d) { return d.split(';')[0].split(':')[1]; }
+
+  // ── GENERATE ──
+  async function generate() {
+    const apiKey = document.getElementById('apiKeyInput').value.trim();
+    const tone = document.getElementById('toneSelect').value;
+    const ratio = document.getElementById('ratioSelect').value;
+    const styles = tagState.style.length ? tagState.style.join(', ') : 'Street Style tự nhiên';
+    const bgs    = tagState.bg.length    ? tagState.bg.join(', ')    : 'phố đô thị Việt Nam';
+    const extras = tagState.extra.length ? tagState.extra.join(', ') : '';
+
+    const toneMap = {
+      warm:'warm golden tones - ánh vàng ấm', cool:'cool tones - xanh mát trong trẻo',
+      neutral:'neutral natural tones', dark:'dark moody dramatic tones',
+      pastel:'soft pastel light tones', vivid:'vivid highly saturated colors',
+      film:'cinematic film grain tones', bw:'black and white monochrome photography'
+    };
+
+    if (!modelDataUrl) return showError('⚠️ Vui lòng upload ảnh người mẫu!');
+    if (!garmentDataUrl) return showError('⚠️ Vui lòng upload ảnh trang phục!');
+    if (!apiKey) return showError('⚠️ Vui lòng nhập Gemini API Key! (Miễn phí tại aistudio.google.com/apikey)');
+
+    document.getElementById('mainForm').style.display = 'none';
+    document.getElementById('loadingState').classList.add('show');
+    document.getElementById('step2').classList.remove('active'); document.getElementById('step2').classList.add('done');
+    document.getElementById('step3').classList.add('active');
+
+    const promptText = `Bạn là STUDIO AI NGỌC NHẤT. Phân tích 2 ảnh:
+Ảnh 1: Người mẫu. Ảnh 2: Trang phục cần mặc thử lên người mẫu.
+
+Yêu cầu người dùng:
+- Phong cách: ${styles}
+- Bối cảnh: ${bgs}
+- Tone màu: ${toneMap[tone]}
+- Tỉ lệ ảnh: ${ratio}
+${extras ? '- Yêu cầu đặc biệt: ' + extras : ''}
+
+Trả về JSON thuần (không markdown, không backtick):
+{
+  "model_description": "mô tả người mẫu: dáng, tóc, màu da",
+  "garment_description": "mô tả chi tiết trang phục: loại, màu, chất liệu, form, họa tiết",
+  "prompt_en": "prompt đầy đủ tiếng Anh cho Kolors/Ideogram: [mô tả người mẫu], wearing [chi tiết trang phục], [bối cảnh], [phong cách], [tone màu], ${extras}, photorealistic 8K fashion photography, sharp focus, natural skin texture, professional lighting",
+  "negative_prompt": "deformed hands, extra fingers, missing fingers, blurry, cartoon, anime, watermark, logo, text, bad anatomy, extra limbs, plastic skin, overexposed, distorted face, low quality",
+  "caption1": "caption cảm xúc lifestyle tiếng Việt 1-2 câu tự nhiên gần gũi",
+  "caption2": "caption mô tả outfit tiếng Việt, highlight màu sắc chất liệu điểm đẹp",
+  "caption3": "caption CTA tiếng Việt rõ ràng với: inbox ngay / link bio / comment SIZE hoặc MÀU",
+  "hashtags": ["ootd","fashionvietnam","ngocnhat","streetstyle","outfitoftheday","thoitrangviet","shopviet","fashionstyle","lookbook","instafashion","styleinspo","outfitcheck","fashiongram","thoitrang","vietnamesefashion"]
+}`;
+
+    try {
+      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          contents:[{ parts:[
+            { text: promptText },
+            { inline_data:{ mime_type: getMime(modelDataUrl),   data: fileToBase64(modelDataUrl) } },
+            { inline_data:{ mime_type: getMime(garmentDataUrl), data: fileToBase64(garmentDataUrl) } }
+          ]}],
+          generationConfig:{ temperature:0.75, maxOutputTokens:2048 }
+        })
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error?.message || 'API lỗi');
+      const raw = data.candidates[0].content.parts[0].text;
+      const match = raw.match(/\{[\s\S]*\}/);
+      if (!match) throw new Error('Không đọc được kết quả từ AI');
+      const result = JSON.parse(match[0]);
+      resultData = result;
+      showResult(result);
+    } catch(err) {
+      document.getElementById('loadingState').classList.remove('show');
+      document.getElementById('mainForm').style.display = 'block';
+      showError('❌ ' + err.message + ' — Kiểm tra API Key hoặc kết nối mạng.');
+    }
+  }
+
+  function showResult(r) {
+    document.getElementById('loadingState').classList.remove('show');
+    document.getElementById('step3').classList.remove('active'); document.getElementById('step3').classList.add('done');
+    document.getElementById('step4').classList.add('active');
+    document.getElementById('modelPreviewResult').src   = modelDataUrl;
+    document.getElementById('garmentPreviewResult').src = garmentDataUrl;
+    document.getElementById('promptContent').textContent = r.prompt_en + '\n\n⛔ Negative: ' + r.negative_prompt;
+    document.getElementById('caption1').textContent = r.caption1;
+    document.getElementById('caption2').textContent = r.caption2;
+    document.getElementById('caption3').textContent = r.caption3;
+    const hw = document.getElementById('hashtagContent');
+    hw.innerHTML = '';
+    (r.hashtags||[]).forEach(h => {
+      const s = document.createElement('span'); s.className='hashtag';
+      s.textContent = '#'+h.replace(/^#/,''); hw.appendChild(s);
+    });
+    document.getElementById('resultSection').classList.add('show');
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
+
+  function copyText(id, btn) {
+    const el = document.getElementById(id);
+    const text = id==='hashtagContent'
+      ? Array.from(el.querySelectorAll('.hashtag')).map(s=>s.textContent).join(' ')
+      : el.textContent;
+    navigator.clipboard.writeText(text).then(()=>{
+      btn.textContent='✓ Copied!'; btn.classList.add('copied');
+      setTimeout(()=>{ btn.textContent='Copy'; btn.classList.remove('copied'); },2000);
+    });
+  }
+
+  function downloadAll() {
+    const r = resultData;
+    const hashtags = Array.from(document.querySelectorAll('#hashtagContent .hashtag')).map(s=>s.textContent).join(' ');
+    const content = `STUDIO AI NGỌC NHẤT — Kết quả\n${'='.repeat(50)}\n\n⚙️ CÀI ĐẶT:\nPhong cách: ${tagState.style.join(', ')||'Mặc định'}\nBối cảnh: ${tagState.bg.join(', ')||'Mặc định'}\nYêu cầu đặc biệt: ${tagState.extra.join(', ')||'Không có'}\nTone: ${document.getElementById('toneSelect').options[document.getElementById('toneSelect').selectedIndex].text}\nTỉ lệ: ${document.getElementById('ratioSelect').value}\n\n${'─'.repeat(50)}\n📸 PROMPT (Kolors/Ideogram):\n${r.prompt_en}\n\n🚫 NEGATIVE PROMPT:\n${r.negative_prompt}\n\n${'─'.repeat(50)}\n✍️ CAPTION 1:\n${r.caption1}\n\n✍️ CAPTION 2:\n${r.caption2}\n\n✍️ CAPTION 3:\n${r.caption3}\n\n#️⃣ HASHTAG:\n${hashtags}\n${'─'.repeat(50)}\nTạo bởi: Studio AI Ngọc Nhất`;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([content],{type:'text/plain;charset=utf-8'}));
+    a.download = 'ngoc-nhat-content.txt'; a.click();
+  }
+
+  function resetApp() {
+    modelFile=null; garmentFile=null; modelDataUrl=''; garmentDataUrl=''; resultData={};
+    tagState.style=[]; tagState.bg=[]; tagState.extra=[];
+    ['style','bg','extra'].forEach(t=>{ renderTags(t); syncHighlight(t); });
+    document.getElementById('mainForm').style.display='block';
+    document.getElementById('resultSection').classList.remove('show');
+    document.getElementById('loadingState').classList.remove('show');
+    ['step1','step2','step3','step4'].forEach(id=>document.getElementById(id).classList.remove('active','done'));
+    document.getElementById('step1').classList.add('active');
+    document.getElementById('modelCard').classList.remove('has-image');
+    document.getElementById('modelCard').innerHTML=`<input type="file" id="modelInput" accept="image/*" onchange="handleUpload('model',this)"><span class="upload-badge">👤 Người mẫu</span><span class="upload-icon">＋</span><div class="upload-title">Ảnh Người Mẫu</div><div class="upload-hint">Chụp thẳng, rõ mặt<br>Nền đơn giản tốt hơn</div>`;
+    document.getElementById('garmentCard').classList.remove('has-image');
+    document.getElementById('garmentCard').innerHTML=`<input type="file" id="garmentInput" accept="image/*" onchange="handleUpload('garment',this)"><span class="upload-badge">👗 Trang phục</span><span class="upload-icon">＋</span><div class="upload-title">Ảnh Trang Phục</div><div class="upload-hint">Nền trắng càng tốt<br>Rõ chi tiết, không nhàu</div>`;
+  }
+</script>
+</body>
+</html>
