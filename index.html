@@ -1058,15 +1058,15 @@
 
     <!-- API KEY -->
     <div class="api-section">
-      <div class="api-section-title">🔑 Gemini API Key</div>
+      <div class="api-section-title">🔑 OpenRouter API Key</div>
       <div class="api-row">
-        <input type="password" id="apiKeyInput" placeholder="Dán API Key của bạn vào đây...">
+        <input type="password" id="apiKeyInput" placeholder="Dán OpenRouter API Key vào đây... (sk-or-v1-...)">
       </div>
       <div class="api-help">
         Chưa có API Key? → Vào 
-        <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a>
-        → Nhấn <strong>"Create API key"</strong> → Copy → Dán vào ô trên.<br>
-        <strong>Miễn phí hoàn toàn.</strong> Key chỉ lưu trong trình duyệt của bạn, không gửi đi đâu khác.
+        <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai/keys</a>
+        → Đăng nhập Gmail → Nhấn <strong>"Create Key"</strong> → Copy → Dán vào ô trên.<br>
+        <strong>Miễn phí hoàn toàn, không cần thẻ.</strong> Key chỉ lưu trong trình duyệt của bạn.
       </div>
     </div>
 
@@ -1326,14 +1326,14 @@
 
     if (!modelDataUrl) return showError('⚠️ Vui lòng upload ảnh người mẫu!');
     if (!garmentDataUrl) return showError('⚠️ Vui lòng upload ảnh trang phục!');
-    if (!apiKey) return showError('⚠️ Vui lòng nhập Gemini API Key! (Miễn phí tại aistudio.google.com/apikey)');
+    if (!apiKey) return showError('⚠️ Vui lòng nhập OpenRouter API Key! (Miễn phí tại openrouter.ai/keys)');
 
     document.getElementById('mainForm').style.display = 'none';
     document.getElementById('loadingState').classList.add('show');
     document.getElementById('step2').classList.remove('active'); document.getElementById('step2').classList.add('done');
     document.getElementById('step3').classList.add('active');
 
-    const promptText = `Bạn là STUDIO AI NGỌC NHẤT. Phân tích 2 ảnh:
+    const promptText = `Bạn là STUDIO AI NGỌC NHẤT. Phân tích 2 ảnh được gửi kèm:
 Ảnh 1: Người mẫu. Ảnh 2: Trang phục cần mặc thử lên người mẫu.
 
 Yêu cầu người dùng:
@@ -1343,11 +1343,11 @@ Yêu cầu người dùng:
 - Tỉ lệ ảnh: ${ratio}
 ${extras ? '- Yêu cầu đặc biệt: ' + extras : ''}
 
-Trả về JSON thuần (không markdown, không backtick):
+Trả về JSON thuần (không markdown, không backtick, không giải thích):
 {
   "model_description": "mô tả người mẫu: dáng, tóc, màu da",
   "garment_description": "mô tả chi tiết trang phục: loại, màu, chất liệu, form, họa tiết",
-  "prompt_en": "prompt đầy đủ tiếng Anh cho Kolors/Ideogram: [mô tả người mẫu], wearing [chi tiết trang phục], [bối cảnh], [phong cách], [tone màu], ${extras}, photorealistic 8K fashion photography, sharp focus, natural skin texture, professional lighting",
+  "prompt_en": "prompt đầy đủ tiếng Anh cho Kolors/Ideogram: [mô tả người mẫu], wearing [chi tiết trang phục], [bối cảnh], [phong cách], [tone màu], photorealistic 8K fashion photography, sharp focus, natural skin texture, professional lighting",
   "negative_prompt": "deformed hands, extra fingers, missing fingers, blurry, cartoon, anime, watermark, logo, text, bad anatomy, extra limbs, plastic skin, overexposed, distorted face, low quality",
   "caption1": "caption cảm xúc lifestyle tiếng Việt 1-2 câu tự nhiên gần gũi",
   "caption2": "caption mô tả outfit tiếng Việt, highlight màu sắc chất liệu điểm đẹp",
@@ -1356,20 +1356,31 @@ Trả về JSON thuần (không markdown, không backtick):
 }`;
 
     try {
-      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
-        method:'POST', headers:{'Content-Type':'application/json'},
+      const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+          'HTTP-Referer': 'https://lengocnhat.github.io/studio-ai-ngoc-nhat/',
+          'X-Title': 'Studio AI Ngoc Nhat'
+        },
         body: JSON.stringify({
-          contents:[{ parts:[
-            { text: promptText },
-            { inline_data:{ mime_type: getMime(modelDataUrl),   data: fileToBase64(modelDataUrl) } },
-            { inline_data:{ mime_type: getMime(garmentDataUrl), data: fileToBase64(garmentDataUrl) } }
-          ]}],
-          generationConfig:{ temperature:0.75, maxOutputTokens:2048 }
+          model: 'google/gemini-2.0-flash-exp:free',
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'text', text: promptText },
+              { type: 'image_url', image_url: { url: modelDataUrl } },
+              { type: 'image_url', image_url: { url: garmentDataUrl } }
+            ]
+          }],
+          temperature: 0.75,
+          max_tokens: 2048
         })
       });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error?.message || 'API lỗi');
-      const raw = data.candidates[0].content.parts[0].text;
+      const raw = data.choices[0].message.content;
       const match = raw.match(/\{[\s\S]*\}/);
       if (!match) throw new Error('Không đọc được kết quả từ AI');
       const result = JSON.parse(match[0]);
